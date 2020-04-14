@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <meta http-equiv="X-UA-Compatible" content="ie=edge"/>
+    <title>Help children learn reading</title>
+    <link href="https://fonts.googleapis.com/css2?family=Muli&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./style.css"/>
+</head>
+<body>
+<header>
+    <h1>Lesen üben</h1>
+</header>
+<main id="settings">
+    <h2>Einstellungen</h2>
+    <textarea id="sourceText">Das Monster wird
+ganz blass vor Glück.
+"Bis morgen!" ruft es.</textarea>
+</main>
+<main id="exercise">
+    <button id="button">Start</button>
+    <div id="textToRead"></div>
+</main>
+<div class="pyro">
+    <div class="before"></div>
+    <div class="after"></div>
+</div>
+<script>
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'de-AT';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    const textToRead = document.getElementById("textToRead");
+    const settingsTab = document.getElementById("settings");
+    let wordsToRead = []
+    let currentWordIndex = 0;
+    let lastWordIndex = 0;
+    const button = document.getElementById("button");
+    let listening = false;
+    const stop = () => {
+        recognition.stop();
+        listening = false
+        button.textContent = "Start";
+    };
+
+    const start = () => {
+        settingsTab.classList.remove('show')
+        settingsTab.classList.add('hide')
+        document.getElementsByClassName('pyro')[0].classList.remove('show')
+        currentWordIndex = 0;
+        lastWordIndex = 0;
+        // let text = `Das Monster wird ganz blass vor Glück. Bis morgen! ruft es.`
+        // let text = `Das ist für dich! sagt Moritz. Das Monster strahlt. Grässlichen Dank!`
+        // let text = `"Bis morgen!" sagt Moritz. Aber das Monster ist schon verschwunden.`
+        parseText(document.getElementById('sourceText').value)
+        renderWords()
+        recognition.start();
+        button.textContent = "Stop";
+    };
+
+    function checkForFinal() {
+        if (currentWordIndex <= lastWordIndex) {
+            return;
+        }
+
+        stop()
+        document.getElementsByClassName('pyro')[0].classList.add('show')
+    }
+
+    function parseText(text) {
+        wordsToRead = text.replace(/(?:\r\n|\r|\n)/g, '<br> ').split(' ').map((word) => {
+            let displayWord = word.replace('<br>', '')
+            return {
+                display: displayWord,
+                stripped: displayWord.replace(/[^\u00C0-\u017FA-Za-z]/g, '').toLowerCase(),
+                newLine: !!word.match('<br>'),
+                matched: false,
+            }
+        })
+
+        lastWordIndex = wordsToRead.length - 1
+    }
+
+    function renderWords() {
+        let renderedWords = []
+
+        wordsToRead.forEach(function (item, index) {
+            let word = document.createElement('span');
+            word.innerText = item.display
+
+            if (item.matched) {
+                word.classList.add('matched')
+            }
+
+            if (index === currentWordIndex) {
+                console.log('listen to ' + item.stripped)
+
+                word.classList.add('current')
+            }
+
+            renderedWords.push(word.outerHTML);
+            if (item.newLine) {
+                renderedWords.push('<br>');
+            }
+        })
+
+        textToRead.innerHTML = renderedWords.join(' ')
+    }
+
+    function heardWord(word) {
+        console.log('hear ' + word)
+        wordsToRead = wordsToRead.map(function (item, index) {
+            if (index === currentWordIndex && item.stripped === word) {
+                item.matched = true
+                currentWordIndex++
+            }
+
+            return item;
+        })
+
+        checkForFinal()
+        renderWords()
+    }
+
+    const onResult = event => {
+        const res = event.results[event.results.length - 1]
+        heardWord(res[0].transcript.replace(/[^\u00C0-\u017FA-Za-z]/g, ' ').toLowerCase().split(' ').splice(-1)[0])
+    };
+
+    recognition.addEventListener("result", onResult);
+    button.addEventListener("click", event => {
+        listening ? stop() : start();
+        listening = !listening;
+    });
+</script>
+</body>
+</html>
